@@ -326,7 +326,7 @@ function goDetail(id: number) {
 .history-page {
   min-height: 100vh;
   background: #f7f8fa;
-  padding-bottom: 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 .page-header {

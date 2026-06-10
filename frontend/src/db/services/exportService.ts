@@ -100,12 +100,14 @@ export function validateBackupJSON(json: unknown): json is BackupData {
   if (!json || typeof json !== 'object') return false
   const obj = json as Record<string, unknown>
 
-  // 必须有 meta
+  // 必须有 meta（顶层）
   if (!obj.meta || typeof obj.meta !== 'object') return false
   const meta = obj.meta as Record<string, unknown>
-  if (!meta.appName || !meta.backupVersion || !meta.data) return false
+  // meta 必须包含 appName 和 backupVersion
+  // （注意：data 在顶层，不在 meta 内）
+  if (!meta.appName || meta.backupVersion === undefined) return false
 
-  // 必须有 data
+  // 必须有 data（顶层）
   const data = obj.data as Record<string, unknown>
   if (!data || typeof data !== 'object') return false
   if (!Array.isArray(data.plots)) return false
@@ -116,47 +118,126 @@ export function validateBackupJSON(json: unknown): json is BackupData {
   return true
 }
 
-/** 将 JSON 字符串中的日期字段还原为 Date 对象 */
+/** 恢复结果 */
+export interface RestoreResult {
+  plots: number
+  plantingRecords: number
+  operationRecords: number
+  salesRecords: number
+}
+
+/**
+ * 将 JSON 中的日期字符串还原为 Date 对象
+ * 兼容：字符串日期 → Date、已有 Date 对象保持不变、null/undefined 跳过
+ * 不会因日期转换失败而中断恢复
+ */
 function reviveDates<T>(record: T): T {
   if (!record || typeof record !== 'object') return record
   const r = record as Record<string, unknown>
-  if (r.createdAt && typeof r.createdAt === 'string') {
-    r.createdAt = new Date(r.createdAt as string)
-  }
-  if (r.updatedAt && typeof r.updatedAt === 'string') {
-    r.updatedAt = new Date(r.updatedAt as string)
+
+  const dateFields = ['createdAt', 'updatedAt']
+  for (const field of dateFields) {
+    const val = r[field]
+    // 跳过 null / undefined
+    if (val == null) continue
+    // 已经是 Date 对象，保持不变
+    if (val instanceof Date) continue
+    // 字符串 → Date
+    if (typeof val === 'string') {
+      const d = new Date(val)
+      if (isNaN(d.getTime())) {
+        console.warn(`[农记] 日期字段 ${field} 值无效: "${val}"，使用当前时间`)
+        r[field] = new Date()
+      } else {
+        r[field] = d
+      }
+    }
+    // 其他类型（数字等）也尝试转换
+    if (typeof val === 'number') {
+      r[field] = new Date(val)
+    }
   }
   return record
 }
 
-/** 从备份数据恢复到数据库（清空现有数据后导入） */
-export async function restoreFromBackup(backup: BackupData): Promise<void> {
+/** 从备份数据恢复到数据库（清空现有数据后导入，在事务中执行保证原子性） */
+export async function restoreFromBackup(backup: BackupData): Promise<RestoreResult> {
   const { plots, plantingRecords, operationRecords, salesRecords } = backup.data
 
-  // 还原日期字段
+  console.log('[农记] 开始恢复数据...')
+  console.log(`[农记] 备份文件内容: ${plots.length} 地块, ${plantingRecords.length} 种植档案, ${operationRecords.length} 作业记录, ${salesRecords.length} 销售记录`)
+
+  // 还原日期字段（字符串 → Date）
   const revivedPlots = plots.map(reviveDates)
   const revivedPlantings = plantingRecords.map(reviveDates)
   const revivedOperations = operationRecords.map(reviveDates)
   const revivedSales = salesRecords.map(reviveDates)
 
   // 在事务中执行：先清空再批量导入，保证原子性
+  // 如果任何一步失败，整个事务自动回滚，不会破坏当前数据
   await db.transaction(
     'rw',
     [db.plots, db.plantingRecords, db.operationRecords, db.salesRecords],
     async () => {
-      // 先清空（顺序：先删子表再删父表）
+      // 先清空（顺序：先删子表再删父表，避免外键约束问题）
       await db.salesRecords.clear()
       await db.operationRecords.clear()
       await db.plantingRecords.clear()
       await db.plots.clear()
 
-      // 导入（顺序：先父表后子表，保留原始 ID）
-      if (revivedPlots.length > 0) await db.plots.bulkAdd(revivedPlots)
-      if (revivedPlantings.length > 0) await db.plantingRecords.bulkAdd(revivedPlantings)
-      if (revivedOperations.length > 0) await db.operationRecords.bulkAdd(revivedOperations)
-      if (revivedSales.length > 0) await db.salesRecords.bulkAdd(revivedSales)
+      // 导入（顺序：先父表后子表，保留原始 id，使用 bulkPut 更安全）
+      if (revivedPlots.length > 0) await db.plots.bulkPut(revivedPlots)
+      if (revivedPlantings.length > 0) await db.plantingRecords.bulkPut(revivedPlantings)
+      if (revivedOperations.length > 0) await db.operationRecords.bulkPut(revivedOperations)
+      if (revivedSales.length > 0) await db.salesRecords.bulkPut(revivedSales)
     }
   )
+
+  // ========== 验证恢复结果 ==========
+  const [actualPlots, actualPlantings, actualOperations, actualSales] = await Promise.all([
+    db.plots.count(),
+    db.plantingRecords.count(),
+    db.operationRecords.count(),
+    db.salesRecords.count(),
+  ])
+
+  console.log(`[农记] 恢复后数据库实际数量: ${actualPlots} 地块, ${actualPlantings} 种植档案, ${actualOperations} 作业记录, ${actualSales} 销售记录`)
+
+  // 验证数量一致性
+  const expected = {
+    plots: revivedPlots.length,
+    plantingRecords: revivedPlantings.length,
+    operationRecords: revivedOperations.length,
+    salesRecords: revivedSales.length,
+  }
+  const actual = {
+    plots: actualPlots,
+    plantingRecords: actualPlantings,
+    operationRecords: actualOperations,
+    salesRecords: actualSales,
+  }
+
+  if (
+    actual.plots !== expected.plots ||
+    actual.plantingRecords !== expected.plantingRecords ||
+    actual.operationRecords !== expected.operationRecords ||
+    actual.salesRecords !== expected.salesRecords
+  ) {
+    console.error('[农记] 恢复数量不一致:', { expected, actual })
+    throw new Error(
+      `恢复数据数量不一致：期望 ${expected.plots}/${expected.plantingRecords}/${expected.operationRecords}/${expected.salesRecords}，` +
+      `实际 ${actual.plots}/${actual.plantingRecords}/${actual.operationRecords}/${actual.salesRecords}`
+    )
+  }
+
+  console.log('[农记] 数据恢复成功，数量验证通过')
+
+  return {
+    plots: actualPlots,
+    plantingRecords: actualPlantings,
+    operationRecords: actualOperations,
+    salesRecords: actualSales,
+  }
 }
 
 // =============================================

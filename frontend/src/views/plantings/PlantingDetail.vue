@@ -51,7 +51,7 @@
         </div>
 
         <van-loading v-if="opsLoading" class="loading-small" size="20" />
-        <van-empty v-else-if="operations.length === 0" image="description" description="暂无作业记录" />
+        <van-empty v-else-if="operations.length === 0" image="default" description="暂无作业记录" />
 
         <div v-else class="item-cards">
           <van-swipe-cell v-for="op in operations" :key="op.id">
@@ -117,7 +117,7 @@
         </div>
 
         <van-loading v-if="salesLoading" class="loading-small" size="20" />
-        <van-empty v-else-if="sales.length === 0" image="description" description="暂无销售记录" />
+        <van-empty v-else-if="sales.length === 0" image="default" description="暂无销售记录" />
 
         <div v-else class="item-cards">
           <van-swipe-cell v-for="s in sales" :key="s.id">
@@ -336,7 +336,7 @@ async function handleDeleteSale(s: SalesRecord) {
 </script>
 
 <style scoped>
-.planting-detail-page { min-height: 100vh; background: #f7f8fa; padding-bottom: 24px; }
+.planting-detail-page { min-height: 100vh; background: #f7f8fa; padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 .loading-center { display: flex; justify-content: center; padding-top: 100px; }
 .loading-small { display: flex; justify-content: center; padding: 20px 0; }
 

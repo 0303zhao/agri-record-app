@@ -262,6 +262,6 @@ function goBack() {
 }
 
 .submit-area {
-  padding: 24px 16px;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
 }
 </style>

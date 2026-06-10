@@ -25,6 +25,8 @@ body {
   user-select: none;
   /* 平滑字体 */
   -webkit-font-smoothing: antialiased;
+  /* 防止 iOS 橡皮筋效果导致误触 */
+  overscroll-behavior: none;
 }
 
 #app {
@@ -39,15 +41,38 @@ body {
 
 /* 页面容器：留出顶部导航和底部 TabBar 的空间 */
 .page-container {
-  padding: 16px 16px 60px;
+  padding: 16px 16px calc(60px + env(safe-area-inset-bottom, 0px));
   min-height: 100%;
 }
 
 /* 通用卡片样式 */
 .card {
   background: #fff;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* 移动端底部安全距离 */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 数字输入框：右对齐，便于阅读金额 */
+input[type="number"] {
+  text-align: right;
+}
+
+/* 页面背景统一 */
+.page-bg {
+  background: #f7f8fa;
+  min-height: 100vh;
+}
+
+/* 统一 CellGroup 标题样式 */
+:deep(.van-cell-group__title) {
+  padding: 16px 16px 8px !important;
+  font-size: 14px !important;
+  color: #999 !important;
 }

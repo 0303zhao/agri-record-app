@@ -90,7 +90,7 @@
         <!-- 空状态 -->
         <van-empty
           v-else-if="plantings.length === 0"
-          image="description"
+          image="default"
           description="暂无种植档案"
         >
           <p class="empty-hint">
@@ -104,38 +104,27 @@
             v-for="pr in plantings"
             :key="pr.id"
           >
-            <van-card
-              class="planting-card"
-              :title="pr.cropName"
-              :thumb="getCropThumb(pr.cropName)"
-              @click="goPlantingDetail(pr.id!)"
-            >
-              <template #desc>
-                <div class="card-desc">
-                  <span>{{ pr.year }} 年 · {{ pr.season }}</span>
-                </div>
-              </template>
-
-              <template #tags>
-                <van-tag type="primary" size="medium" style="margin-right: 6px">
-                  {{ pr.area }} 亩
-                </van-tag>
-                <van-tag
-                  v-if="pr.variety"
-                  type="success"
-                  size="medium"
-                  style="margin-right: 6px"
-                >
-                  {{ pr.variety }}
-                </van-tag>
-                <van-tag
-                  :type="pr.status === 1 ? 'warning' : 'success'"
-                  size="medium"
-                >
+            <div class="planting-card" @click="goPlantingDetail(pr.id!)">
+              <!-- 第一行：作物名称 + 状态 -->
+              <div class="pr-card-row pr-card-top">
+                <span class="pr-crop-name">{{ pr.cropName }}</span>
+                <span :class="['pr-status-tag', pr.status === 1 ? 'progress' : 'done']">
                   {{ pr.status === 1 ? '进行中' : '已完成' }}
-                </van-tag>
-              </template>
-            </van-card>
+                </span>
+              </div>
+
+              <!-- 第二行：年份 · 季节 -->
+              <div class="pr-card-row">
+                <span class="pr-year-season">{{ pr.year }} 年 · {{ pr.season }}</span>
+              </div>
+
+              <!-- 第三行：标签（面积 + 品种） -->
+              <div class="pr-card-row pr-card-tags">
+                <span class="pr-area-badge">{{ pr.area }} 亩</span>
+                <span class="pr-variety-text" v-if="pr.variety">{{ pr.variety }}</span>
+                <span class="pr-variety-text pr-no-variety" v-else>未填写品种</span>
+              </div>
+            </div>
 
             <!-- 滑动操作 -->
             <template #right>
@@ -262,18 +251,6 @@ async function handleDeletePlanting(pr: PlantingRecord) {
 
 // ---- 工具 ----
 
-function getCropThumb(cropName: string): string {
-  const map: Record<string, string> = {
-    '小麦': 'https://img.yzcdn.cn/vant/ipad.jpeg',
-    '玉米': 'https://img.yzcdn.cn/vant/cat.jpeg',
-    '大豆': 'https://img.yzcdn.cn/vant/cat.jpeg',
-    '水稻': 'https://img.yzcdn.cn/vant/ipad.jpeg',
-    '花生': 'https://img.yzcdn.cn/vant/cat.jpeg',
-    '棉花': 'https://img.yzcdn.cn/vant/ipad.jpeg',
-  }
-  return map[cropName] || 'https://img.yzcdn.cn/vant/ipad.jpeg'
-}
-
 function formatDate(date: Date): string {
   const d = new Date(date)
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -285,7 +262,7 @@ function formatDate(date: Date): string {
 .plot-detail-page {
   min-height: 100vh;
   background: #f7f8fa;
-  padding-bottom: 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 .loading-center {
@@ -370,15 +347,83 @@ function formatDate(date: Date): string {
 
 .planting-card {
   background: #fff;
-  margin-bottom: 8px;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 10px;
+  padding: 16px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
 }
 
-.card-desc {
+.planting-card:active {
+  background: #f9f9f9;
+}
+
+/* 档案卡片行 */
+.pr-card-row {
+  display: flex;
+  align-items: center;
+}
+
+.pr-card-top {
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.pr-card-tags {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 作物名称 */
+.pr-crop-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* 年份季节 */
+.pr-year-season {
   font-size: 13px;
-  color: #666;
+  color: #999;
+}
+
+/* 状态标签 */
+.pr-status-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.pr-status-tag.progress {
+  color: #ff976a;
+  background: #fff7f0;
+}
+
+.pr-status-tag.done {
+  color: #07c160;
+  background: #e8f8ee;
+}
+
+/* 面积标签（绿色高亮） */
+.pr-area-badge {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1989fa;
+  background: #f0f7ff;
+  padding: 2px 10px;
+  border-radius: 6px;
+}
+
+/* 品种文字 */
+.pr-variety-text {
+  font-size: 12px;
+  color: #888;
+}
+
+.pr-no-variety {
+  color: #ccc;
 }
 
 /* 滑动操作 */

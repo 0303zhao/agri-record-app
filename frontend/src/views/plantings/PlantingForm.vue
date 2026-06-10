@@ -180,7 +180,7 @@ const seasonActions = seasonPresets.map((s) => ({ name: s }))
 
 /** 作物选择器 */
 const showCropPicker = ref(false)
-const cropPresets = ['小麦', '玉米', '大豆', '水稻', '花生', '棉花', '其他']
+const cropPresets = ['小麦', '玉米']
 const cropActions = cropPresets.map((c) => ({ name: c }))
 
 /** 加载数据 */
@@ -313,6 +313,6 @@ function goBack() {
 }
 
 .submit-area {
-  padding: 24px 16px;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
 }
 </style>
