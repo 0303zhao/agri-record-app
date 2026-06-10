@@ -1,0 +1,10 @@
+# Project root .gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/
